@@ -362,15 +362,15 @@ target_link_libraries(RFF PRIVATE
         # Win32 Linker
         comctl32
         # OpenCV Linkers
-        opencv_core4110
-        opencv_imgcodecs4110
-        opencv_imgproc4110
-        opencv_videoio4110
-        opencv_highgui4110
+        opencv_core
+        opencv_imgcodecs
+        opencv_imgproc
+        opencv_videoio
+        opencv_highgui
         # Vulkan
         Vulkan::Vulkan
 )
 
 
-add_custom_target(spirv ALL COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/compile.ps1")
-add_dependencies(RFF spirv)
+#add_custom_target(spirv ALL COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/compile.ps1")
+#add_dependencies(RFF spirv)
