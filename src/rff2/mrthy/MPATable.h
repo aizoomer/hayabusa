@@ -1,6 +1,7 @@
 //
 // Created by Merutilm on 2025-05-18.
 // Created by Super Fractal on 2025-11-24.
+// Fixed by Assistant.
 //
 
 #pragma once
@@ -52,26 +53,11 @@ namespace merutilm::rff2 {
         void generateTable(const ParallelRenderState &state, const Ref &reference, Num dcMax,
                            std::function<void(uint64_t, double)> &&actionPerCreatingTableIteration);
 
-        // 【修正】std::vector -> SegmentedVector に変更
         template<typename PAB>
         void allocateTableSize(SegmentedVector<std::vector<PAB> > &table, uint64_t index, uint64_t levels);
 
-        /**
-         * Gets the pulled table index of MPA Table.
-         * @param mpaPeriod The generated MPA Period
-         * @param iteration The iteration to pull
-         * @return The pulled index. if not found, returns @code UINT64_MAX@endcode
-         */
         static uint64_t iterationToPulledTableIndex(const MPAPeriod &mpaPeriod, uint64_t iteration);
 
-        /**
-         * Gets the finally compressed table index of MPA Table.
-         * @param mpaCompressionMethod The MPA compression Method
-         * @param mpaPeriod The generated MPA Period
-         * @param pulledMPACompressor The compressor of pulled MPA table
-         * @param iteration The iteration to pull
-         * @return The finally compressed index. if not found, returns @code UINT64_MAX@endcode
-         */
         static uint64_t iterationToCompTableIndex(const FrtMPACompressionMethod &mpaCompressionMethod,
                                                   const MPAPeriod &mpaPeriod,
                                                   const std::vector<ArrayCompressionTool> &pulledMPACompressor,
@@ -177,15 +163,13 @@ namespace merutilm::rff2 {
             return;
         }
 
-        // 【修正】std::vector/deque -> SegmentedVector に変更
+        // SegmentedVectorへの参照
         SegmentedVector<std::vector<PAB> > *tablePtr;
         if constexpr (std::is_same_v<LightPA, PAB>) {
             tablePtr = &tableRef.lightTable;
         } else {
             tablePtr = &tableRef.deepTable;
         }
-        
-        // 【修正】SegmentedVector型参照
         auto &table = *tablePtr;
 
         const auto &tablePeriod = mpaPeriod->tablePeriod;
@@ -207,74 +191,143 @@ namespace merutilm::rff2 {
         auto currentPA = std::vector<std::unique_ptr<PAG> >(levels);
         auto dpTableTemps = std::array<dex, 8>();
 
-        // 【修正】std::ranges::for_each は自作クラスのイテレータ非対応のため、インデックスループに変更
         for (size_t i = 0; i < table.size(); ++i) {
             table[i].clear();
         }
 
-    // ========================================================================================================
-    // OPTIMIZATION: Fast Path for NO_COMPRESSION
-    // ========================================================================================================
-    if (mpaCompressionMethod == FrtMPACompressionMethod::NO_COMPRESSION) {
-        
-        // SegmentedVectorのreserveを呼んでおく（API互換・管理領域のみ確保）
-        //if (table.capacity() <= longestPeriod) {
-            //table.reserve(longestPeriod + 1);
-        //}
-
-        uint64_t absIteration = 0;
-
-        while (iteration <= longestPeriod) {
-            if (absIteration % Constants::Fractal::EXIT_CHECK_INTERVAL == 0 && state.interruptRequested()) return;
-
-            func(iteration, static_cast<double>(iteration) / static_cast<double>(longestPeriod));
-
-            bool resetLowerLevel = false;
-
-            for (uint64_t level = levels; level > 0; --level) {
-                const uint64_t i = level - 1;
-                
-                if (periodCount[i] == 0) {
-                    if constexpr (std::is_same_v<PAG, LightPAGenerator>) {
-                        currentPA[i] = LightPAGenerator::create(reference, epsilon, dcMax, iteration);
-                    } else {
-                        currentPA[i] = DeepPAGenerator::create(reference, epsilon, dcMax, iteration, dpTableTemps);
-                    }
-                }
-
-                if (currentPA[i] != nullptr && periodCount[i] + REQUIRED_PERTURBATION < tablePeriod[i]) {
-                    currentPA[i]->step();
-                }
-
-                periodCount[i]++;
-
-                if (periodCount[i] == tablePeriod[i]) {
-                    if (const PAG *currentLevel = currentPA[i].get();
-                        currentLevel != nullptr &&
-                        currentLevel->getSkip() == tablePeriod[i] - REQUIRED_PERTURBATION
-                    ) {
-                        const uint64_t storeIndex = currentLevel->getStart();
-                        
-                        // 必要に応じて拡張
-                        while (table.size() <= storeIndex) {
-                            table.emplace_back();
-                        }
-
-                        table[storeIndex].push_back(currentLevel->build());
-                    }
-                    currentPA[i] = nullptr;
-                    resetLowerLevel = true;
-                }
-
-                if (resetLowerLevel) {
-                    periodCount[i] = 0;
-                }
+        // ========================================================================================================
+        // OPTIMIZATION: Fast Path for NO_COMPRESSION
+        // ========================================================================================================
+        if (mpaCompressionMethod == FrtMPACompressionMethod::NO_COMPRESSION) {
+            
+            // 【重要修正 1】 外側のコンテナのみ予約する
+            // これによりSegmentedVectorのセグメント管理領域の断片化を防ぎます。
+            // データ自体の領域(inner vector)は予約しないので、メモリ使用量は増えません。
+            if (table.capacity() <= longestPeriod) {
+                table.reserve(longestPeriod + 1);
             }
-            ++iteration;
-            ++absIteration;
+
+            uint64_t absIteration = 0;
+
+            while (iteration <= longestPeriod) {
+                if (absIteration % Constants::Fractal::EXIT_CHECK_INTERVAL == 0 && state.interruptRequested()) return;
+
+                func(iteration, static_cast<double>(iteration) / static_cast<double>(longestPeriod));
+
+                bool resetLowerLevel = false;
+
+                for (uint64_t level = levels; level > 0; --level) {
+                    const uint64_t i = level - 1;
+                    
+                    if (periodCount[i] == 0) {
+                        if constexpr (std::is_same_v<PAG, LightPAGenerator>) {
+                            currentPA[i] = LightPAGenerator::create(reference, epsilon, dcMax, iteration);
+                        } else {
+                            currentPA[i] = DeepPAGenerator::create(reference, epsilon, dcMax, iteration, dpTableTemps);
+                        }
+                    }
+
+                    if (currentPA[i] != nullptr && periodCount[i] + REQUIRED_PERTURBATION < tablePeriod[i]) {
+                        currentPA[i]->step();
+                    }
+
+                    periodCount[i]++;
+
+                    if (periodCount[i] == tablePeriod[i]) {
+                        if (const PAG *currentLevel = currentPA[i].get();
+                            currentLevel != nullptr &&
+                            currentLevel->getSkip() == tablePeriod[i] - REQUIRED_PERTURBATION
+                        ) {
+                            const uint64_t storeIndex = currentLevel->getStart();
+                            
+                            // 【重要修正 2】 allocateTableSizeを使わず、reserve無しで追加する
+                            // NO_COMPRESSION時は各インデックスに1要素しか入らないことが多いため、
+                            // levels分をreserveするとメモリが無駄になります。
+                            // 単純に push_back だけ行うことで、必要最小限(capacity=1 or 2)に留めます。
+                            
+                            while (table.size() <= storeIndex) {
+                                table.emplace_back(); 
+                            }
+
+                            // 念のため、非常に多く呼ばれるなら inner vector のキャパシティを最適化することも可能ですが、
+                            // 通常は push_back だけで最小限の確保になります。
+                            table[storeIndex].push_back(currentLevel->build());
+                        }
+                        currentPA[i] = nullptr;
+                        resetLowerLevel = true;
+                    }
+
+                    if (resetLowerLevel) {
+                        periodCount[i] = 0;
+                    }
+                }
+                ++iteration;
+                ++absIteration;
+            }
+            return; // End of Fast Path
         }
-        return; // End of Fast Path
-    }
+
+        // ========================================================================================================
+        // OPTIMIZATION: Fast Path for NO_COMPRESSION
+        // ========================================================================================================
+        if (mpaCompressionMethod == FrtMPACompressionMethod::NO_COMPRESSION) {
+            
+            // SegmentedVectorがreserveをサポートしている場合、有効化を推奨
+            // table.reserve(longestPeriod + 1); 
+
+            uint64_t absIteration = 0;
+
+            while (iteration <= longestPeriod) {
+                if (absIteration % Constants::Fractal::EXIT_CHECK_INTERVAL == 0 && state.interruptRequested()) return;
+
+                func(iteration, static_cast<double>(iteration) / static_cast<double>(longestPeriod));
+
+                bool resetLowerLevel = false;
+
+                for (uint64_t level = levels; level > 0; --level) {
+                    const uint64_t i = level - 1;
+                    
+                    if (periodCount[i] == 0) {
+                        if constexpr (std::is_same_v<PAG, LightPAGenerator>) {
+                            currentPA[i] = LightPAGenerator::create(reference, epsilon, dcMax, iteration);
+                        } else {
+                            currentPA[i] = DeepPAGenerator::create(reference, epsilon, dcMax, iteration, dpTableTemps);
+                        }
+                    }
+
+                    if (currentPA[i] != nullptr && periodCount[i] + REQUIRED_PERTURBATION < tablePeriod[i]) {
+                        currentPA[i]->step();
+                    }
+
+                    periodCount[i]++;
+
+                    if (periodCount[i] == tablePeriod[i]) {
+                        if (const PAG *currentLevel = currentPA[i].get();
+                            currentLevel != nullptr &&
+                            currentLevel->getSkip() == tablePeriod[i] - REQUIRED_PERTURBATION
+                        ) {
+                            const uint64_t storeIndex = currentLevel->getStart();
+                            
+                            // 【修正】手動ループではなくallocateTableSizeを使用して内部ベクタをreserveする
+                            // 元のコード: while (table.size() <= storeIndex) { table.emplace_back(); }
+                            // 修正後:
+                            allocateTableSize<PAB>(table, storeIndex, levels);
+
+                            table[storeIndex].push_back(currentLevel->build());
+                        }
+                        currentPA[i] = nullptr;
+                        resetLowerLevel = true;
+                    }
+
+                    if (resetLowerLevel) {
+                        periodCount[i] = 0;
+                    }
+                }
+                ++iteration;
+                ++absIteration;
+            }
+            return; // End of Fast Path
+        }
 
 
         // ========================================================================================================
@@ -282,14 +335,14 @@ namespace merutilm::rff2 {
         // ========================================================================================================
 
         uint64_t absIteration = 0;
-
+        
+        // 元のコードにはありませんでしたが、ここでも可能ならOuter Vectorの予約を行うべきです
         const uint64_t size = iterationToCompTableIndex(mpaCompressionMethod, *mpaPeriod, pulledMPACompressor,
                                                         longestPeriod + 1);
+        // table.reserve(size);
 
-        //table.reserve(size);
         allocateTableSize<PAB>(table, 0, levels);
-        const std::vector<PAB> &mainReferenceMPA = table[0]; // unique_ptr管理なのでリサイズされても安全
-
+        const std::vector<PAB> &mainReferenceMPA = table[0]; 
 
         while (iteration <= longestPeriod) {
             if (absIteration % Constants::Fractal::EXIT_CHECK_INTERVAL == 0 && state.interruptRequested()) return;
@@ -468,7 +521,7 @@ namespace merutilm::rff2 {
         }
     }
 
-    // 【修正】SegmentedVectorに対応
+    // 【修正】SegmentedVectorに対応しつつ、確実にreserveを行う
     template<typename Ref, typename Num>
     template<typename PAB>
     void MPATable<Ref, Num>::allocateTableSize(SegmentedVector<std::vector<PAB> > &table, const uint64_t index,
@@ -478,8 +531,12 @@ namespace merutilm::rff2 {
         }
         if (table.size() == index) {
             table.emplace_back();
+            // .back() でアクセスして reserve
             table.back().reserve(levels);
         }
-        table[index].reserve(levels);
+        // 既存の要素であっても、不足していれば reserve する（安全策）
+        if (table[index].capacity() < levels) {
+            table[index].reserve(levels);
+        }
     }
 }
