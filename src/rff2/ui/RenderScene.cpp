@@ -1,5 +1,6 @@
 //
 // Created by Merutilm on 2025-08-08.
+// Created by Super Fractal on 2025-11-27.
 //
 
 #include "RenderScene.hpp"
@@ -181,7 +182,7 @@ namespace merutilm::rff2 {
                 },
                 .exportation = {
                     .fps = 60,
-                    .bitrate = 9000
+                    .bitrate = 65535
                 }
             }
         };
@@ -526,7 +527,7 @@ namespace merutilm::rff2 {
         if (state.interruptRequested()) return false;
 
         setStatusMessage(Constants::Status::ZOOM_STATUS,
-                         std::format(L"Z : {:.06f}E{:d}", pow(10, fmod(logZoom, 1)), static_cast<int>(logZoom)));
+                         std::format(L"Z : {:.02f}E{:d}", pow(10, fmod(logZoom, 1)), static_cast<int>(logZoom)));
 
         const std::array<dex, 2> offset = offsetConversion(attr, 0, 0);
         dex dcMax = dex::ZERO;

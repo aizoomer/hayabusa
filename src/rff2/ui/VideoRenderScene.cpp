@@ -1,12 +1,16 @@
 //
 // Created by Merutilm on 2025-09-06.
+// Created by Super Fractal on 2025-11-25.
 //
+
 
 #include "VideoRenderScene.hpp"
 
 #include "../../vulkan_helper/util/BufferImageContextUtils.hpp"
 #include "../vulkan/RCCPresentVid.hpp"
 #include "opencv2/imgproc.hpp"
+#include "../constants/FractalConstants.hpp"
+#include "../constants/VideoConstants.hpp"
 
 namespace merutilm::rff2 {
     VideoRenderScene::VideoRenderScene(vkh::EngineRef engine, vkh::WindowContextRef wc, const VkExtent2D &videoExtent,

@@ -146,8 +146,8 @@ namespace merutilm::rff2 {
         addChildItem(currentMenu, "Export Zooming Video", CallbackVideo::EXPORT_ZOOM_VID);
         currentMenu = addChildMenu(menubar, "Explore");
         addChildItem(currentMenu, "Recompute", CallbackExplore::RECOMPUTE);
-        addChildItem(currentMenu, "Reset", CallbackExplore::RESET);
         addChildItem(currentMenu, "Cancel", CallbackExplore::CANCEL_RENDER);
+        addChildItem(currentMenu, "Reset", CallbackExplore::RESET);
         addChildItem(currentMenu, "Find Center", CallbackExplore::FIND_CENTER);
         addChildItem(currentMenu, "Locate Minibrot", CallbackExplore::LOCATE_MINIBROT);
     }
