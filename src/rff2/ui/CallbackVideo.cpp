@@ -1,5 +1,6 @@
 //
 // Created by Merutilm on 2025-06-08.
+// Created by Super Fractal on 2025-11-27.
 //
 
 #include "CallbackVideo.hpp"
@@ -16,6 +17,19 @@
 
 
 namespace merutilm::rff2 {
+
+    // 【追加】ここに入れます (ヘルパークラス)
+    struct ScopedVideoLock {
+        RenderScene& scene;
+        ScopedVideoLock(RenderScene& s) : scene(s) {
+            scene.setVideoGenerationActive(true);
+        }
+        ~ScopedVideoLock() {
+            scene.setVideoGenerationActive(false);
+        }
+    };
+
+
     const std::function<void(SettingsMenu &, RenderScene &)> CallbackVideo::DATA_SETTINGS = [
             ](SettingsMenu &settingsMenu, RenderScene &scene) {
         auto &[defaultZoomIncrement, isStatic] = scene.getAttribute().video.data;
@@ -73,6 +87,7 @@ namespace merutilm::rff2 {
             ](const SettingsMenu &, RenderScene &scene) {
         scene.getBackgroundThreads().createThread(
             [&scene](BackgroundThread &thread) {
+                ScopedVideoLock lock(scene);
                 const auto &state = scene.getState();
                 const auto dirPtr = IOUtilities::ioDirectoryDialog(L"Folder to generate keyframes");
 

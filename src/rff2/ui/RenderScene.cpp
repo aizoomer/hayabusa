@@ -189,13 +189,31 @@ namespace merutilm::rff2 {
     }
 
     LRESULT RenderScene::renderSceneProc(const HWND hwnd, const UINT msg, const WPARAM wparam, const LPARAM lparam) {
-        RenderScene &scene = *reinterpret_cast<RenderScene *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-        scene.runAction(msg, wparam, lparam);
+        auto* scene = reinterpret_cast<RenderScene *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+        
+        // ポインタが有効な場合のみ実行する
+        if (scene != nullptr) {
+            scene->runAction(msg, wparam, lparam);
+        }
+        
         return DefWindowProcW(hwnd, msg, wparam, lparam);
     }
 
     void RenderScene::runAction(const UINT msg, const WPARAM wparam, const LPARAM) {
-        switch (msg) {
+
+        if (isVideoGenerationActive) {
+            switch (msg) {
+                case WM_LBUTTONDOWN:
+                case WM_LBUTTONUP:
+                case WM_MOUSEMOVE:
+                case WM_MOUSEWHEEL:
+                    return;
+                default:
+                    break;
+            }
+        }
+
+        switch (msg) {    
             case WM_LBUTTONDOWN: {
                 SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
                 interactedMX = getMouseXOnIterationBuffer();

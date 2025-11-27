@@ -1,5 +1,6 @@
 //
 // Created by Merutilm on 2025-08-08.
+// Created by Super Fractal on 2025-11-27.
 //
 
 #pragma once
@@ -34,6 +35,8 @@ namespace merutilm::rff2 {
         RenderSceneRequests requests;
 
         std::atomic<bool> idleCompute = true;
+        std::atomic<bool> isVideoGenerationActive{false}; 
+
 
         ApproxTableCache approxTableCache = ApproxTableCache();
 
@@ -186,6 +189,14 @@ namespace merutilm::rff2 {
 
         [[nodiscard]] bool isIdleCompute() const {
             return idleCompute;
+        }
+
+        void setVideoGenerationActive(bool active) {
+            isVideoGenerationActive = active;
+        }
+
+        [[nodiscard]] bool getVideoGenerationActive() const {
+            return isVideoGenerationActive;
         }
 
 
