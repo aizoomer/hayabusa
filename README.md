@@ -5,7 +5,7 @@ This repository is a **modified version** of the [original RFF project](https://
 
 ## RFF 2.0 Improvements
 
-RFF 2.0 has been modified to significantly improve stability and memory efficiency.
+RFF 2.0 Super has been modified to significantly improve stability and memory efficiency.
 > [!NOTE]
 > As a trade-off for better memory management, rendering speed in this version is slightly slower than the standard RFF.
 
